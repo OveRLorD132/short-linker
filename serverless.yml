@@ -1,0 +1,78 @@
+service: short-linker-sls
+frameworkVersion: '3'
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+custom:
+  tableName: 'users-table-${sls:stage}'
+  tokensTableName: 'refresh-tokens-${sls:stage}'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ UsersTable, Arn ]
+            - Fn::GetAtt: [ RefreshTokens, Arn ]
+  environment:
+    SECRET_KEY: 'Some secret words'
+    ACCESS_KEY_TTL: '1h'
+    LINK_LENGTH: 6
+    USERS_TABLE: ${self:custom.tableName}
+    TOKENS_TABLE: ${self:custom.tokensTableName}
+
+functions:
+  auth:
+    handler: ./auth/auth.handler
+    events: 
+      - httpApi: 'ANY /auth/{any}'
+  short-links:
+    handler: ./short-links/app.handler
+    events: 
+      - httpApi: 'ANY /sh-lkr/{any}'
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: EmailIndex
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: 'ALL'
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.tableName}
+    RefreshTokens:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.tokensTableName}

@@ -6,9 +6,6 @@ import DbTable from "../../../module_global/DB_Classes/Db-table";
 
 export default class UsersTable extends DbTable {
   #tableName : string | undefined = process.env.USERS_TABLE;
-  async scanTable() : Promise<any> {
-    return await super.scanTable(this.#tableName);
-  }
   async checkUniqueId(userId : string) : Promise<boolean> {
     let params : GetCommandInput = {
       TableName: this.#tableName,
@@ -42,11 +39,35 @@ export default class UsersTable extends DbTable {
       throw err;
     }
   }
+  async getByEmail(email : string) : Promise<UserProfile | undefined> {
+    let params : QueryCommandInput = {
+      TableName : this.#tableName,
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: "#email = :email",
+      ExpressionAttributeNames: {
+        "#email": 'email'
+      },
+      ExpressionAttributeValues: {
+        ":email": { S: email }
+      }
+    }
+    try {
+      let result = await this.client.send(new QueryCommand(params));
+      if(!result.Items?.length) return undefined;
+      let res = {};
+      for(let key in result.Items[0]) {
+        res[key] = result.Items[0][key].S;
+      }
+      return res as UserProfile;
+    } catch(err) {
+      throw err;
+    }
+  }
   async addUser(email : string, password : string) : Promise<UserProfile> {
     let userId = uuidv4();
     try {
       if(!(await this.checkUniqueId(userId))) return await this.addUser(email, password);
-      if(!(await this.checkUniqueEmail(email))) throw new Error('Email must be unique');
+      //if(!(await this.checkUniqueEmail(email))) throw new Error('Email must be unique');
       password = await bcrypt.hash(password, 12);
       let params : UserInsertParams = {
         TableName: this.#tableName,

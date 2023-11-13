@@ -3,6 +3,12 @@ interface AuthRequest {
   password : string;
 }
 
+interface AuthenticationResponse {
+  success : boolean;
+  data? : AuthTokens;
+  error? : string;
+}
+
 interface UserProfile {
   userId : string;
   email : string;

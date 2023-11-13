@@ -7,10 +7,4 @@ export default class DbTable {
     let client = new DynamoDBClient();
     this.client = DynamoDBDocumentClient.from(client);
   }
-  async scanTable(tableName : string | undefined) {
-    let params : ScanTableParams = {
-      TableName: tableName
-    }
-    return (await this.client.send(new ScanCommand(params))).Items;
-  }
 }

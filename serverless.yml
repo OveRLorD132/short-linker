@@ -1,4 +1,4 @@
-service: short-linker-sls
+service: short-linker-serverless
 frameworkVersion: '3'
 
 plugins:
@@ -8,10 +8,21 @@ plugins:
 custom:
   tableName: 'users-table-${sls:stage}'
   tokensTableName: 'refresh-tokens-${sls:stage}'
+  shortLinksTableName: 'short-links-table-${sls:stage}'
 
 provider:
   name: aws
   runtime: nodejs18.x
+  logs:
+    httpApi: true
+  httpApi:
+    cors: true
+    authorizers: 
+      customFunc:
+        type: request
+        functionName: authorizerFunc
+        name: myAuthorizer
+        payloadVersion: '2.0'
   iam:
     role:
       statements:
@@ -24,14 +35,16 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
           Resource:
-            - Fn::GetAtt: [ UsersTable, Arn ]
-            - Fn::GetAtt: [ RefreshTokens, Arn ]
+            - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:custom.tableName}*"
+            - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:custom.tokensTableName}*"
+            - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:custom.shortLinksTableName}*"
   environment:
     SECRET_KEY: 'Some secret words'
     ACCESS_KEY_TTL: '1h'
     LINK_LENGTH: 6
     USERS_TABLE: ${self:custom.tableName}
     TOKENS_TABLE: ${self:custom.tokensTableName}
+    SHORT_LINKS_TABLE: ${self:custom.shortLinksTableName}
 
 functions:
   auth:
@@ -41,8 +54,21 @@ functions:
   short-links:
     handler: ./short-links/app.handler
     events: 
-      - httpApi: 'ANY /sh-lkr/{any}'
-
+      - httpApi:
+          path: /sh-lks/{any}
+          method: any
+  manage-links:
+    handler: ./manage-links/app.handler
+    events:
+      - httpApi:
+          path: /short-linker/{any}
+          method: any
+          authorizer:
+            type: request 
+            name: authorizerFunc
+  authorizerFunc:
+    handler: authorizer.handler
+    
 resources:
   Resources:
     UsersTable:
@@ -76,3 +102,27 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.tokensTableName}
+    ShortLinksTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: linkId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: linkId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserIdIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: 'ALL'
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.shortLinksTableName}
+        TimeToLiveSpecification:
+          AttributeName: timeToLive
+          Enabled: true
+

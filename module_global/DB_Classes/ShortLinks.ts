@@ -16,7 +16,8 @@ export default class ShortLinks extends DbTable {
         userId,
         origLink,
         timeToLive,
-        isOneTimeLink
+        isOneTimeLink,
+        visits: 0
       }
       let params : PutCommandInput = {
         TableName: this.#tableName,
@@ -37,7 +38,8 @@ export default class ShortLinks extends DbTable {
         }
       }
       let result = await this.client.send(new GetCommand(params))
-      if(result.Item && result.Item.isOneTimeLink) this.deleteLink(linkId)
+      if(result.Item && result.Item.isOneTimeLink) this.deleteLink(linkId);
+      if(result.Item && !result.Item.isOneTimeLink) this.incrementVisitsNum(result.Item as ShortLinkData);
       return result.Item as ShortLinkData;
     } catch(err) {
       throw err;
@@ -71,6 +73,21 @@ export default class ShortLinks extends DbTable {
       let result = await this.client.send(new QueryCommand(params));
       return result.Items as Array<ShortLinkData> | undefined;
     } catch(err) {
+      throw err;
+    }
+  }
+  async incrementVisitsNum(item : ShortLinkData) : Promise<void> {
+    try {
+      console.log(item);
+      item.visits++;
+      let params : PutCommandInput = {
+        TableName: this.#tableName,
+        Item: item
+      } 
+      console.log(item);
+      await this.client.send(new PutCommand(params));
+    } catch(err) {
+      console.log(err);
       throw err;
     }
   }

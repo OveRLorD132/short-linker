@@ -1,10 +1,16 @@
 service: short-linker-serverless
 frameworkVersion: '3'
 
+constructs:
+  messages-queue:
+    type: queue
+    worker:
+      handler: ./link-delete-handling/messages.handler
+
 plugins:
   - serverless-esbuild
   - serverless-offline
-
+  - serverless-lift
 custom:
   tableName: 'users-table-${sls:stage}'
   tokensTableName: 'refresh-tokens-${sls:stage}'
@@ -34,10 +40,14 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
+            - ses:SendEmail
+            - ses:VerifyEmailIdentity
           Resource:
+            - "arn:aws:sts::${aws:accountId}:assumed-role/*"
             - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:custom.tableName}*"
             - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:custom.tokensTableName}*"
             - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:custom.shortLinksTableName}*"
+            - 'arn:aws:ses:${aws:region}:${aws:accountId}:identity/*'
   environment:
     SECRET_KEY: 'Some secret words'
     ACCESS_KEY_TTL: '1h'
@@ -45,6 +55,8 @@ provider:
     USERS_TABLE: ${self:custom.tableName}
     TOKENS_TABLE: ${self:custom.tokensTableName}
     SHORT_LINKS_TABLE: ${self:custom.shortLinksTableName}
+    QUEUE_LINK: 'https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${self:service}-${sls:stage}-messages-queue'
+    REGION: ${aws:region}
 
 functions:
   auth:
@@ -65,9 +77,20 @@ functions:
           method: any
           authorizer:
             type: request 
-            name: authorizerFunc
+            name: customFunc
   authorizerFunc:
     handler: authorizer.handler
+  deleteHandling:
+    handler: ./link-delete-handling/app.handler
+    events:
+      - stream:
+          type: dynamodb
+          arn: 
+            Fn::GetAtt:
+              - ShortLinksTable
+              - StreamArn
+          batchSize: 10
+          maximumBatchingWindow: 60
     
 resources:
   Resources:
@@ -120,6 +143,8 @@ resources:
                 KeyType: HASH
             Projection:
               ProjectionType: 'ALL'
+        StreamSpecification:
+          StreamViewType: OLD_IMAGE
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.shortLinksTableName}
         TimeToLiveSpecification:

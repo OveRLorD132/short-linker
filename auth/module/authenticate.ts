@@ -1,4 +1,4 @@
-import UsersTable from "./DB/UsersTable";
+import UsersTable from "../../module_global/DB_Classes/UsersTable";
 
 let usersTable = new UsersTable();
 

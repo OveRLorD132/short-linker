@@ -4,7 +4,7 @@ let app : Express = express();
 
 import serverless from 'serverless-http';
 
-import UsersTable from './module/DB/UsersTable';
+import UsersTable from '../module_global/DB_Classes/UsersTable';
 
 let usersTable = new UsersTable();
 

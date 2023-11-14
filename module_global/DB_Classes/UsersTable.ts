@@ -1,8 +1,11 @@
 import { QueryCommand } from "@aws-sdk/client-dynamodb";
-import { GetCommand, GetCommandInput, PutCommand, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, GetCommandInput, PutCommand, PutCommandInput, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import bcrypt from "bcryptjs/dist/bcrypt";
 import { v4 as uuidv4 } from 'uuid';
-import DbTable from "../../../module_global/DB_Classes/Db-table";
+import DbTable from "./Db-table";
+import { SES } from "@aws-sdk/client-ses";
+
+let client = new SES({ region: process.env.REGION });
 
 export default class UsersTable extends DbTable {
   #tableName : string | undefined = process.env.USERS_TABLE;
@@ -67,7 +70,7 @@ export default class UsersTable extends DbTable {
     let userId = uuidv4();
     try {
       if(!(await this.checkUniqueId(userId))) return await this.addUser(email, password);
-      //if(!(await this.checkUniqueEmail(email))) throw new Error('Email must be unique');
+      if(!(await this.checkUniqueEmail(email))) throw new Error('Email must be unique');
       password = await bcrypt.hash(password, 12);
       let params : UserInsertParams = {
         TableName: this.#tableName,
@@ -78,7 +81,28 @@ export default class UsersTable extends DbTable {
         }
       } 
       await this.client.send(new PutCommand(params)); 
+      client.verifyEmailIdentity({
+        EmailAddress: email
+      }).then((data) => {
+        console.log("verified");
+      }).catch((err) => {
+        console.log(err);
+      })
       return { userId, email, password };
+    } catch(err) {
+      throw err;
+    }
+  }
+  async getById(userId : string) : Promise<UserProfile> {
+    try {
+      let params : GetCommandInput = {
+        TableName: this.#tableName,
+        Key: {
+          userId
+        }
+      }
+      let result = await this.client.send(new GetCommand(params));
+      return result.Item as UserProfile;
     } catch(err) {
       throw err;
     }

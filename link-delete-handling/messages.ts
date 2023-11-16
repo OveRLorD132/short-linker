@@ -21,7 +21,7 @@ export async function handler(event : SQSEvent, context : Context) : Promise<any
       let data = await client.sendEmail({
         Destination: { ToAddresses: [ userInfo.email ] },
         Message: { Body: { Text: { Data: email } }, Subject: { Data: 'Link expired', Charset: 'UTF-8' } },
-        Source: 'overlord32475@gmail.com'
+        Source: process.env.SENDER
       })
       console.log(data);
     } catch(err) {

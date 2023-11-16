@@ -57,6 +57,8 @@ provider:
     SHORT_LINKS_TABLE: ${self:custom.shortLinksTableName}
     QUEUE_LINK: 'https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${self:service}-${sls:stage}-messages-queue'
     REGION: ${aws:region}
+    # Your email here
+    SENDER: 'overlord32475@gmail.com'
 
 functions:
   auth:
@@ -78,6 +80,7 @@ functions:
           authorizer:
             type: request 
             name: customFunc
+            #name: authorizerFunc
   authorizerFunc:
     handler: authorizer.handler
   deleteHandling:
@@ -90,7 +93,6 @@ functions:
               - ShortLinksTable
               - StreamArn
           batchSize: 10
-          maximumBatchingWindow: 60
     
 resources:
   Resources:

@@ -32,7 +32,7 @@ app.post('/auth/sign-up', async (req : Request, res : Response) => {
     } else {
       console.log(err);
       status = 500;
-      info = { success: false, error: err};
+      info = { success: false, error: 'Internal Server Error'};
     }
   }
   res.status(status).send(info);
@@ -62,11 +62,26 @@ app.post('/auth/sign-in', async (req : Request, res : Response) => {
       status = 500;
       info = {
         success: false,
-        error: err
+        error: 'Internal Server Error'
       }
     }
   }
   res.status(status).send(info);
+})
+
+app.post('/auth/refresh-tokens', async (req, res) => {
+  try {
+    let { refreshToken } = req.body;
+    if(!refreshToken) { res.status(400).send('Refresh Token Is Required')};
+    let tokens = await JWT.prototype.tokenRefresh(refreshToken);
+    res.status(200).send(tokens);
+  } catch(err) {
+    if(err.message === 'Invalid Token') {
+      res.status(400).send(err.message);
+    }
+    console.log(err);
+    res.status(500).send('Internal Server Error');
+  }
 })
 
 let handler = serverless(app);

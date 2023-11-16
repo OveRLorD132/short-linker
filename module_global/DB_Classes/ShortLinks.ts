@@ -51,13 +51,13 @@ export default class ShortLinks extends DbTable {
         TableName: this.#tableName,
         Key: { linkId }
       }
-      await this.client.send(new DeleteCommand(params));
+      let data = await this.client.send(new DeleteCommand(params));
+      console.log(data);
     } catch(err) {
       throw err;
     }
   }
   async getByUserId(userId : string) : Promise<Array<ShortLinkData> | undefined> {
-    console.log(userId);
     let params : QueryCommandInput = {
       TableName: this.#tableName,
       IndexName: 'UserIdIndex',
@@ -78,13 +78,11 @@ export default class ShortLinks extends DbTable {
   }
   async incrementVisitsNum(item : ShortLinkData) : Promise<void> {
     try {
-      console.log(item);
       item.visits++;
       let params : PutCommandInput = {
         TableName: this.#tableName,
         Item: item
       } 
-      console.log(item);
       await this.client.send(new PutCommand(params));
     } catch(err) {
       console.log(err);
